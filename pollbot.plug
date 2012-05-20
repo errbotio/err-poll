@@ -1,0 +1,6 @@
+[Core]
+Name = PollBot
+Module = pollBot
+
+[Documentation]
+Description = let's decide what to do

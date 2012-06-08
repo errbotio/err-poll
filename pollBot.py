@@ -1,9 +1,7 @@
 # -*- coding: utf-8 -*-
-import os
-import shelve
-from botplugin import BotPlugin
-from jabberbot import botcmd
-from utils import get_jid_from_message, drawbar
+from errbot.botplugin import BotPlugin
+from errbot.jabberbot import botcmd
+from errbot.utils import get_jid_from_message, drawbar
 
 __author__ = 'gbin'
 Q = 'question'

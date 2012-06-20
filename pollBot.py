@@ -21,16 +21,16 @@ class PollBot(BotPlugin):
     @botcmd
     def poll_new(self, mess, args):
         """Create a new poll."""
-        title = args.strip()
+        title = args
 
         if not title:
             return u'usage: !poll new <poll_title>'
 
-        if title in self.shelf:
+        if title in self:
             return u'A poll with that title already exists.'
 
         poll = ({}, [])
-        self.shelf[title] = poll
+        self[title] = poll
 
         if not PollBot.active_poll:
             PollBot.active_poll = title
@@ -40,13 +40,13 @@ class PollBot(BotPlugin):
     @botcmd
     def poll_remove(self, mess, args):
         """Remove a poll."""
-        title = args.strip()
+        title = args
 
         if not title:
             return u'usage: !poll remove <poll_title>'
 
         try:
-            del self.shelf[title]
+            del self[title]
             return u'Poll removed.'
         except KeyError:
             return u'That poll does not exist. Use !poll list to see all polls.'
@@ -54,8 +54,8 @@ class PollBot(BotPlugin):
     @botcmd
     def poll_list(self, mess, args):
         """List all polls."""
-        if len(self.shelf) > 0:
-            return u'All Polls:\n' + u'\n'.join([title + (u' *' if title == PollBot.active_poll else u'') for title in self.shelf])
+        if len(self) > 0:
+            return u'All Polls:\n' + u'\n'.join([title + (u' *' if title == PollBot.active_poll else u'') for title in self])
         else:
             return u'No polls found. Use !poll new to add one.'
 
@@ -65,12 +65,12 @@ class PollBot(BotPlugin):
         if PollBot.active_poll is not None:
             return u'"%s" is currently running, use !poll stop to finish it.' % PollBot.active_poll
 
-        title = args.strip()
+        title = args
 
         if not title:
             return u'usage: !poll start <poll_title>'
 
-        if not title in self.shelf:
+        if not title in self:
             return u'Poll not found. Use !poll list to see all polls.'
 
         self.reset_poll(title)
@@ -92,7 +92,7 @@ class PollBot(BotPlugin):
     @botcmd
     def poll_addoption(self, mess, args):
         """Add an option to the currently running poll."""
-        option = args.strip()
+        option = args
 
         if not PollBot.active_poll:
             return u'No active poll. Use !poll start to start a poll.'
@@ -100,13 +100,13 @@ class PollBot(BotPlugin):
         if not option:
             return u'usage: !poll option add <poll_option>'
 
-        poll = self.shelf[PollBot.active_poll]
+        poll = self[PollBot.active_poll]
 
         if option in poll[0]:
             return u'Option already exists. Use !poll show to see all options.'
 
         poll[0][option] = 0
-        self.shelf[PollBot.active_poll] = poll
+        self[PollBot.active_poll] = poll
 
         return self.format_poll(PollBot.active_poll)
         #return u'Added \'%s\' to poll.' % option
@@ -125,7 +125,7 @@ class PollBot(BotPlugin):
         if not PollBot.active_poll:
             return u'No active poll. Use !poll start to start a poll.'
 
-        index = args.strip()
+        index = args
 
         if not index:
             return u'usage: !poll vote <option_number>'
@@ -133,7 +133,7 @@ class PollBot(BotPlugin):
         if not index.isdigit():
             return u'Please vote using the numerical index of the option.'
 
-        poll = self.shelf[PollBot.active_poll]
+        poll = self[PollBot.active_poll]
         options = poll[0]
 
         index = int(index)
@@ -154,12 +154,12 @@ class PollBot(BotPlugin):
         usernames.append(username)
 
         options[option] += 1
-        self.shelf[PollBot.active_poll] = poll
+        self[PollBot.active_poll] = poll
 
         return self.format_poll(PollBot.active_poll)
 
     def format_poll(self, title):
-        poll = self.shelf[title]
+        poll = self[title]
 
         total_votes = sum(poll[0].values())
 
@@ -172,7 +172,7 @@ class PollBot(BotPlugin):
         return result.strip()
 
     def reset_poll(self, title):
-        poll = self.shelf[title]
+        poll = self[title]
 
         options = poll[0]
         usernames = poll[1]
@@ -182,4 +182,4 @@ class PollBot(BotPlugin):
 
         del usernames[:]
 
-        self.shelf[title] = poll
+        self[title] = poll

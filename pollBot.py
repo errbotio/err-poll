@@ -11,6 +11,7 @@ from errbot.utils import get_jid_from_message, drawbar
 
 class PollBot(BotPlugin):
 
+    min_err_version = '1.2.1' # it needs split_args
     active_poll = None
 
     @botcmd

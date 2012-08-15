@@ -1,7 +1,15 @@
 # -*- coding: utf-8 -*-
-from errbot.botplugin import BotPlugin
-from errbot.jabberbot import botcmd
 from errbot.utils import get_jid_from_message, drawbar
+
+# Backward compatibility
+from errbot.version import VERSION
+from errbot.utils import version2array
+if version2array(VERSION) >= [1,6,0]:
+    from errbot import botcmd, BotPlugin
+else:
+    from errbot.botplugin import BotPlugin
+    from errbot.jabberbot import botcmd
+
 
 # The polls are stored in the shelf. The root of the shelf is a dictionary, where K = name of the poll and V = the poll data.
 # This data itself is a tuple of a dictionary and a list: ({}, [])

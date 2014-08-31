@@ -2,5 +2,8 @@
 Name = PollBot
 Module = pollBot
 
+[Python]
+Version = 2+
+
 [Documentation]
 Description = let's decide what to do

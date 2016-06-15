@@ -1,9 +1,6 @@
 [Core]
-Name = PollBot
-Module = pollBot
-
-[Python]
-Version = 2+
+Name = Poll
+Module = poll
 
 [Documentation]
 Description = let's decide what to do

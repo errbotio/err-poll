@@ -1,185 +1,186 @@
+from typing import List, Mapping
+
+from errbot.backends.base import Identifier
 from errbot.utils import drawbar
 from errbot import botcmd, BotPlugin
 
 
-# The polls are stored in the shelf. The root of the shelf is a dictionary, where K = name of the poll and V = the poll data.
-# This data itself is a tuple of a dictionary and a list: ({}, [])
-#   In this dictionary the keys are the poll options and the values are the number of votes.
-#   The list stores the names of the users who already voted.
+class PollEntry(object):
+    """
+    This is just a data object that can be pickled.
+    """
+    def __init__(self):
+        self._options = {}
+        self._has_voted = []
+
+    @property
+    def options(self) -> Mapping[str, int]:
+        return self._options
+
+    @property
+    def has_voted(self) -> List[Identifier]:
+        return self._has_voted
+
+    def __str__(self) -> str:
+        total_votes = sum(self._options.values())
+
+        result = ''
+        keys = sorted(self._options.keys())
+        for index, option in enumerate(keys):
+            votes = self._options[option]
+            result += '%s %d. %s (%d votes)\n' % (drawbar(votes, total_votes), index+1, option, votes)
+
+        return result.strip()
 
 
 class Poll(BotPlugin):
 
-    def __init__(self, bot):
-        super().__init__(bot)
-        self.current_poll = None
+    def activate(self):
+        super().activate()
+
+        # initial setup
+        if 'current_poll' not in self:
+            self['current_poll'] = None
+        if 'polls' not in self:
+            self['polls'] = {}
 
     @botcmd
-    def poll(self, msg, args):
-        """List all polls."""
-        return self.poll_list(msg, args)
-
-    @botcmd
-    def poll_new(self, msg, args):
-        """Create a new poll."""
-        title = args
-
+    def poll_new(self, _, title):
+        """Create a new poll.
+        usage: !poll new <poll_title>
+        """
         if not title:
             return 'usage: !poll new <poll_title>'
 
-        if title in self:
+        if title in self['polls']:
             return 'A poll with that title already exists.'
 
-        poll = ({}, [])
-        self[title] = poll
+        with self.mutable('polls') as polls:
+            polls[title] = PollEntry()
 
-        if not self.current_poll:
-            self.current_poll = title
+        if not self['current_poll']:
+            self['current_poll'] = title
 
         return 'Poll created. Use !poll option to add options.'
 
     @botcmd
-    def poll_remove(self, mess, args):
+    def poll_remove(self, _, title):
         """Remove a poll."""
-        title = args
-
         if not title:
             return 'usage: !poll remove <poll_title>'
 
-        try:
-            del self[title]
-            return 'Poll removed.'
-        except KeyError as _:
-            return 'That poll does not exist. Use !poll list to see all polls.'
+        with self.mutable('polls') as polls:
+            try:
+                del polls[title]
+            except KeyError as _:
+                return 'That poll does not exist. Use !poll list to see all polls.'
+        return 'Poll removed.'
 
     @botcmd
     def poll_list(self, mess, args):
         """List all polls."""
-        if len(self) > 0:
-            return 'All Polls:\n' + u'\n'.join([title + (u' *' if title == self.current_poll else u'') for title in self])
-        else:
-            return 'No polls found. Use !poll new to add one.'
+        if self['polls']:
+            return 'All Polls:\n' + \
+                   '\n'.join([title + (' *' if title == self['current_poll'] else '') for title in self['polls']])
+        return 'No polls found. Use !poll new to add one.'
 
     @botcmd
-    def poll_start(self, mess, args):
+    def poll_start(self, _, title):
         """Start a saved poll."""
-        if self.current_poll:
-            return '"%s" is currently running, use !poll stop to finish it.' % self.current_poll
-
-        title = args
+        if self['current_poll']:
+            return '"%s" is currently running, use !poll end to finish it.' % self['current_poll']
 
         if not title:
             return 'usage: !poll start <poll_title>'
 
-        if title not in self:
+        if title not in self['polls']:
             return 'Poll not found. Use !poll list to see all polls.'
 
         self.reset_poll(title)
-        self.current_poll = title
+        self['current_poll'] = title
 
-        return self.format_poll(title)
+        return '%s:\n%s' % (title, str(self['polls'][title]))
 
     @botcmd
-    def poll_stop(self, mess, args):
+    def poll_end(self, _, args):
         """Stop the currently running poll."""
+        current_poll = self['current_poll']
+        if not current_poll:
+            return 'There is no active Poll.'
+
         result = 'Poll finished, final results:\n'
-        result += self.format_poll(self.current_poll)
+        result += str(self['polls'][current_poll])
 
-        self.reset_poll(self.current_poll)
-        self.current_poll = None
-
+        self.reset_poll(current_poll)
+        self['current_poll'] = None
         return result
 
     @botcmd
-    def poll_addoption(self, mess, args):
+    def poll_option(self, _, option):
         """Add an option to the currently running poll."""
-        option = args
-
-        if not self.current_poll:
+        current_poll = self['current_poll']
+        if not current_poll:
             return 'No active poll. Use !poll start to start a poll.'
 
         if not option:
-            return 'usage: !poll option add <poll_option>'
+            return 'usage: !poll option <poll_option>'
 
-        poll = self[self.current_poll]
-        options, usernames = poll
+        with self.mutable('polls') as polls:
+            poll = polls[current_poll]
 
-        if option in options:
-            return 'Option already exists. Use !poll show to see all options.'
+            if option in poll.options:
+                return 'Option already exists. Use !poll show to see all options.'
 
-        options[option] = 0
-        self[self.current_poll] = poll
+            poll.options[option] = 0
 
-        return self.format_poll(self.current_poll)
+            return '%s:\n%s' % (current_poll, str(poll))
 
     @botcmd
-    def poll_show(self, mess, args):
+    def poll(self, _, args):
         """Show the currently running poll."""
-        if not self.current_poll:
+        current_poll = self['current_poll']
+
+        if not current_poll:
             return 'No active poll. Use !poll start to start a poll.'
 
-        return self.format_poll(self.current_poll)
+        return '%s:\n%s' % (current_poll, str(self['polls'][current_poll]))
 
     @botcmd
-    def poll_vote(self, mess, args):
+    def vote(self, msg, index):
         """Vote for the currently running poll."""
-        if not self.current_poll:
+        current_poll = self['current_poll']
+        if not current_poll:
             return 'No active poll. Use !poll start to start a poll.'
-
-        index = args
 
         if not index:
-            return 'usage: !poll vote <option_number>'
+            return 'usage: !vote <option_number>'
 
         if not index.isdigit():
             return 'Please vote using the numerical index of the option.'
 
-        poll = self[self.current_poll]
-        options, usernames = poll
+        with self.mutable('polls') as polls:
+            poll = polls[current_poll]
+            index = int(index)
+            if index > len(poll.options) or index < 1:
+                return 'Please choose a number between 1 and %d (inclusive).' % len(poll.options)
 
-        index = int(index)
-        if index > len(options) or index < 1:
-            return 'Please choose a number between 1 and %d (inclusive).' % len(options)
+            option = sorted(poll.options.keys())[index - 1]
 
-        option = list(options.keys())[index - 1]  # FIXME: this looks random
+            if option not in poll.options:
+                return 'Option not found. Use !poll show to see all options of the current poll.'
 
-        if not option in options:
-            return 'Option not found. Use !poll show to see all options of the current poll.'
+            if msg.frm in poll.has_voted:
+                return 'You have already voted.'
 
-        username = mess.frm.stripped
+            poll.has_voted.append(msg.frm)
 
-        if username in usernames:
-            return 'You have already voted.'
+            poll.options[option] += 1
 
-        usernames.append(username)
-
-        options[option] += 1
-        self[self.current_poll] = poll
-
-        return self.format_poll(self.current_poll)
-
-    def format_poll(self, title):
-        poll = self[title]
-        options, usernames = poll
-
-        total_votes = sum(options.values())
-
-        result = self.current_poll + '\n'
-        index = 1
-        for option in options:
-            result += '%s %d. %s (%d votes)\n' % (drawbar(poll[0][option], total_votes), index, option, poll[0][option])
-            index += 1
-
-        return result.strip()
+            return '%s:\n%s' % (current_poll, str(poll))
 
     def reset_poll(self, title):
-        poll = self[title]
-
-        options, usernames = poll
-
-        for option in options:
-            options[option] = 0
-
-        del usernames[:]
-
-        self[title] = poll
+        with self.mutable('polls') as polls:
+            poll = polls[title]
+            for option in poll.options:
+                poll.options[option] = 0
+            del poll.has_voted[:]

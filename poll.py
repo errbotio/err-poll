@@ -1,8 +1,17 @@
 from typing import List, Mapping
 
 from errbot.backends.base import Identifier
-from errbot.utils import drawbar
 from errbot import botcmd, BotPlugin
+
+BAR_WIDTH = 15.0
+
+
+def drawbar(value, max_):
+    if max_:
+        value_in_chr = int(round((value * BAR_WIDTH / max_)))
+    else:
+        value_in_chr = 0
+    return '[' + '█' * value_in_chr + '▒' * int(round(BAR_WIDTH - value_in_chr)) + ']'
 
 
 class PollEntry(object):
